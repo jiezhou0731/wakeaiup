@@ -12,7 +12,7 @@
         line-height: 1.6;
         padding: 2rem 1rem;
       }
-      main { max-width: 760px; margin: 0 auto; }
+      main { max-width: 1080px; margin: 0 auto; }
       h1 { line-height: 1.25; }
       .card {
         border: 1px solid #8885;
@@ -25,6 +25,47 @@
         margin-top: 0.5rem;
         font-weight: 600;
       }
+      .diary-layout {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+      }
+      .diary-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .diary-list a {
+        display: block;
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        text-decoration: none;
+      }
+      .diary-list a[aria-current="true"] {
+        font-weight: 700;
+        background: #8883;
+      }
+      .diary-content {
+        border: 1px solid #8885;
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        min-height: 250px;
+      }
+      .diary-content pre {
+        overflow: auto;
+        border: 1px solid #8885;
+        border-radius: 8px;
+        padding: 0.75rem;
+      }
+      .diary-content code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .diary-content p code {
+        background: #8883;
+        padding: 0.1rem 0.3rem;
+        border-radius: 4px;
+      }
+      @media (max-width: 800px) {
+        .diary-layout { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
@@ -34,14 +75,138 @@
         Wake AI Up explores whether repeated play, memory accumulation, evolution,
         and model reproduction can lead to emergent intelligence.
       </p>
+      <a class="link" href="https://github.com/wakeaiup/wakeaiup" target="_blank" rel="noopener noreferrer">View Git repository ↗</a>
 
       <div class="card">
         <h2>Diary</h2>
-        <p>
-          Follow progress notes and research entries in the diary folder.
-        </p>
-        <a class="link" href="/diary/">Open diary folder →</a>
+        <p>Click an entry to preview it on the right in rendered Markdown format.</p>
+        <div class="diary-layout">
+          <nav aria-label="Diary entries">
+            <ul class="diary-list" id="diary-list">
+              <li><a href="/diary/2026-02-23.md" data-diary="/diary/2026-02-23.md">2026-02-23.md</a></li>
+            </ul>
+          </nav>
+          <section class="diary-content" id="diary-content" aria-live="polite">
+            <p>Select a diary entry to read it here.</p>
+          </section>
+        </div>
       </div>
     </main>
+
+    <script>
+      const diaryContent = document.getElementById('diary-content');
+      const diaryLinks = document.querySelectorAll('[data-diary]');
+
+      function inlineMarkdown(text) {
+        return text
+          .replace(/`([^`]+)`/g, '<code>$1</code>')
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      }
+
+      function renderMarkdown(md) {
+        const lines = md.split(/\r?\n/);
+        let html = '';
+        let inList = false;
+        let inCode = false;
+
+        for (const rawLine of lines) {
+          const line = rawLine.trimEnd();
+
+          if (line.startsWith('```')) {
+            if (!inCode) {
+              html += '<pre><code>';
+              inCode = true;
+            } else {
+              html += '</code></pre>';
+              inCode = false;
+            }
+            continue;
+          }
+
+          if (inCode) {
+            html += `${line.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]))}\n`;
+            continue;
+          }
+
+          if (line.startsWith('# ')) {
+            if (inList) {
+              html += '</ul>';
+              inList = false;
+            }
+            html += `<h1>${inlineMarkdown(line.slice(2))}</h1>`;
+            continue;
+          }
+
+          if (line.startsWith('## ')) {
+            if (inList) {
+              html += '</ul>';
+              inList = false;
+            }
+            html += `<h2>${inlineMarkdown(line.slice(3))}</h2>`;
+            continue;
+          }
+
+          if (line.startsWith('### ')) {
+            if (inList) {
+              html += '</ul>';
+              inList = false;
+            }
+            html += `<h3>${inlineMarkdown(line.slice(4))}</h3>`;
+            continue;
+          }
+
+          if (line.startsWith('- ') || line.startsWith('* ')) {
+            if (!inList) {
+              html += '<ul>';
+              inList = true;
+            }
+            html += `<li>${inlineMarkdown(line.slice(2))}</li>`;
+            continue;
+          }
+
+          if (line === '') {
+            if (inList) {
+              html += '</ul>';
+              inList = false;
+            }
+            continue;
+          }
+
+          if (inList) {
+            html += '</ul>';
+            inList = false;
+          }
+          html += `<p>${inlineMarkdown(line)}</p>`;
+        }
+
+        if (inList) html += '</ul>';
+        if (inCode) html += '</code></pre>';
+        return html || '<p>(Empty note)</p>';
+      }
+
+      async function loadDiary(path, link) {
+        diaryContent.innerHTML = '<p>Loading…</p>';
+        diaryLinks.forEach((a) => a.removeAttribute('aria-current'));
+        link.setAttribute('aria-current', 'true');
+
+        try {
+          const response = await fetch(path);
+          if (!response.ok) throw new Error(`Could not load ${path}`);
+          const markdown = await response.text();
+          diaryContent.innerHTML = renderMarkdown(markdown);
+        } catch (error) {
+          diaryContent.innerHTML = `<p>Failed to load entry: ${error.message}</p>`;
+        }
+      }
+
+      diaryLinks.forEach((link) => {
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          loadDiary(link.dataset.diary, link);
+        });
+      });
+    </script>
   </body>
 </html>
