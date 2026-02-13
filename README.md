@@ -1,6 +1,6 @@
 # 🧠Evolutionary AI Through Games
 
-I believe that human consciousness emerged through play.
+I believe that human consciousness emerged through play and love.
 
 In early human history, survival itself was a game — hunting, gathering, building, competing, cooperating. Through these “games,” individuals accumulated memories. The most essential parts of those memories were passed on to the next generation through genetic material. Over time, this evolutionary feedback loop gave rise to consciousness — perhaps even what we call the soul.
 
